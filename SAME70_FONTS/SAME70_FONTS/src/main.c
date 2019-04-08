@@ -51,6 +51,11 @@ void configure_lcd(void);
 void RTC_init(void);
 void font_draw_text(tFont *font, const char *text, int x, int y, int spacing);
 
+void but2_callback(void)
+{
+	flag_pause = !flag_pause;
+}
+
 void but3_callback(void)
 {
 	counter_vel++;
@@ -118,14 +123,25 @@ void io_init(void){
 	pmc_enable_periph_clk(LED_PIO_ID);
 	pio_configure(LED_PIO, PIO_OUTPUT_0, LED_IDX_MASK, PIO_DEFAULT);
 	
+	pmc_enable_periph_clk(BUT2_PIO_ID);
 	pmc_enable_periph_clk(BUT3_PIO_ID);
+	pio_configure(BUT2_PIO, PIO_INPUT, BUT2_IDX_MASK, PIO_PULLUP);
 	pio_configure(BUT3_PIO, PIO_INPUT, BUT3_IDX_MASK, PIO_PULLUP | PIO_DEBOUNCE);
 	
+	pio_enable_interrupt(BUT2_PIO, BUT2_IDX_MASK);
 	pio_enable_interrupt(BUT3_PIO, BUT3_IDX_MASK);
 	pio_set_debounce_filter(BUT3_PIO, BUT3_IDX_MASK, 20);
 	
+	NVIC_EnableIRQ(BUT2_PIO_ID);
+	NVIC_SetPriority(BUT2_PIO_ID, 4); // Prioridade 3
 	NVIC_EnableIRQ(BUT3_PIO_ID);
 	NVIC_SetPriority(BUT3_PIO_ID, 4); // Prioridade 4
+	
+	pio_handler_set(BUT2_PIO,
+	BUT2_PIO_ID,
+	BUT2_IDX_MASK,
+	PIO_IT_RISE_EDGE,
+	but2_callback);
 	
 	pio_handler_set(BUT3_PIO,
 	BUT3_PIO_ID,
@@ -246,6 +262,5 @@ int main(void) {
 			}
 			pmc_sleep(SAM_PM_SMODE_SLEEP_WFI);
 		}
-	pmc_sleep(SAM_PM_SMODE_SLEEP_WFI);
 	}
 }
