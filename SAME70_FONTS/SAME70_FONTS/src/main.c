@@ -54,6 +54,10 @@ void font_draw_text(tFont *font, const char *text, int x, int y, int spacing);
 void but2_callback(void)
 {
 	flag_pause = !flag_pause;
+	
+	uint16_t pllPreScale = (int) (((float) 32768) / 2.0);
+	uint32_t irqRTTvalue  = 8;
+	RTT_init(pllPreScale, irqRTTvalue);
 }
 
 void but3_callback(void)
@@ -74,12 +78,13 @@ void RTT_Handler(void)
 
 	/* IRQ due to Alarm */
 	if ((ul_status & RTT_SR_ALMS) == RTT_SR_ALMS) {
-		ili9488_draw_filled_rectangle(0, 0, ILI9488_LCD_WIDTH-1, ILI9488_LCD_HEIGHT-1);
-		pin_toggle(LED_PIO, LED_IDX_MASK);    // BLINK Led
-		vel = 3.6*raio*2*pi*counter_vel/4;
-		dist = 2*pi*raio*counter_dist;
-		counter_vel = 0.0;
-		f_rtt_alarme = true;                  // flag RTT alarme
+		if(!flag_pause) {
+			pin_toggle(LED_PIO, LED_IDX_MASK);    // BLINK Led
+			vel = 3.6*raio*2*pi*counter_vel/4;
+			dist = 2*pi*raio*counter_dist;
+			counter_vel = 0.0;
+			f_rtt_alarme = true;                  // flag RTT alarme
+		}
 	}
 }
 
@@ -94,9 +99,7 @@ void RTC_Handler(void)
 	*/
 	if ((ul_status & RTC_SR_SEC) == RTC_SR_SEC) {
 		rtc_clear_status(RTC, RTC_SCCR_SECCLR);
-		
 		flag_rtc = true;
-		
 	}
 	
 	/* Time or date alarm */
@@ -125,10 +128,11 @@ void io_init(void){
 	
 	pmc_enable_periph_clk(BUT2_PIO_ID);
 	pmc_enable_periph_clk(BUT3_PIO_ID);
-	pio_configure(BUT2_PIO, PIO_INPUT, BUT2_IDX_MASK, PIO_PULLUP);
+	pio_configure(BUT2_PIO, PIO_INPUT, BUT2_IDX_MASK, PIO_PULLUP | PIO_DEBOUNCE);
 	pio_configure(BUT3_PIO, PIO_INPUT, BUT3_IDX_MASK, PIO_PULLUP | PIO_DEBOUNCE);
 	
 	pio_enable_interrupt(BUT2_PIO, BUT2_IDX_MASK);
+	pio_set_debounce_filter(BUT2_PIO, BUT2_IDX_MASK, 20);
 	pio_enable_interrupt(BUT3_PIO, BUT3_IDX_MASK);
 	pio_set_debounce_filter(BUT3_PIO, BUT3_IDX_MASK, 20);
 	
@@ -244,6 +248,7 @@ int main(void) {
 				uint16_t pllPreScale = (int) (((float) 32768) / 2.0);
 				uint32_t irqRTTvalue  = 8;
 				RTT_init(pllPreScale, irqRTTvalue);
+				ili9488_draw_filled_rectangle(0, 0, ILI9488_LCD_WIDTH-1, ILI9488_LCD_HEIGHT-1);
 				sprintf(buffer_vel, "Velocidade: %f", vel);
 				sprintf(buffer_dist, "Distancia: %f", dist);
 				font_draw_text(&calibri_36, buffer_vel, 10, 100, 1);
@@ -256,11 +261,11 @@ int main(void) {
 				uint32_t b = 0;
 				uint32_t c = 0;
 				rtc_get_time(RTC, &a, &b, &c);
-
-				sprintf(buffer_time, "Tempo: %d:%d:%d", a, b, c);
+				sprintf(buffer_time, "Tempo: %02d:%02d:%02d", a, b, c);
 				font_draw_text(&calibri_36, buffer_time, 10, 300, 1);
 			}
 			pmc_sleep(SAM_PM_SMODE_SLEEP_WFI);
 		}
+		
 	}
 }
